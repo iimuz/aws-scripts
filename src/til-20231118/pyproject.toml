@@ -1,0 +1,33 @@
+[project]
+authors = [{name = "iimuz", email = "iz.primary.story+github@gmail.com"}]
+description = "AWS用のスクリプト."
+license = {file = "LICENSE"}
+name = "aws-scripts"
+readme = "README.md"
+requires-python = ">=3.10"
+urls = {repository = "https://github.com/iimuz/til/src/til-20231118"}
+version = "0.1.0"
+
+dependencies = []
+
+[tools.setuptools.package-dir]
+aws_scripts = "src"
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "flake8",
+  "flake8-black",
+  "flake8-bugbear",
+  "flake8-docstrings",
+  "flake8-isort",
+  "isort",
+  "mypy",
+]
+test = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+
+[tool.isort]
+profile = "black"
