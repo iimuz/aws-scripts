@@ -1,6 +1,6 @@
 """開発用のEC2インスタンスを作成するときのスクリプト.
 
-利用例: `python src/create_ec2_spot_instance.py -vv`
+利用例: `python src/create_ec2_spot_instance.py -vv src/create_ec2_config.yml --profile AWS_PROFILE`
 """
 import logging
 import sys
