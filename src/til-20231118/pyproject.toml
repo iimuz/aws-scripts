@@ -8,7 +8,11 @@ requires-python = ">=3.10"
 urls = {repository = "https://github.com/iimuz/til/src/til-20231118"}
 version = "0.1.0"
 
-dependencies = []
+dependencies = [
+  "boto3",
+  "pydantic",
+  "pyyaml",
+]
 
 [tools.setuptools.package-dir]
 aws_scripts = "src"

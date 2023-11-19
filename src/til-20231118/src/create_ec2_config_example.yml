@@ -1,0 +1,9 @@
+ami: ami-09a81b370b76de6a2
+instance_name: test
+instance_type: t2.micro
+# Volumes
+root_volume_size: 30
+# Network
+nic_groups: []
+# Security
+ssh_key_name: ec2-instance
