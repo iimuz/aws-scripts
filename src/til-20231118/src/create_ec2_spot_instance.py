@@ -28,6 +28,11 @@ class _RunConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class _AttachVolumesSettings(BaseModel):
+    volume_id: str
+    device_name: str
+
+
 class _Settings(BaseModel):
     ami: str
     instance_name: str
@@ -35,6 +40,7 @@ class _Settings(BaseModel):
 
     # Volumes
     root_volume_size: int = Field(30, ge=8, help="ルートボリュームのサイズ(GB).")
+    attach_volumes: list[_AttachVolumesSettings] | None
 
     # Network
     nic_groups: list[str] = Field(default_factory=lambda: list())
@@ -48,7 +54,7 @@ class _Settings(BaseModel):
 class _EBS(BaseModel):
     """EBSボリュームの設定."""
 
-    snapshot_id: str = Field(
+    snapshot_id: str | None = Field(
         "snap-0ae02beb4873352c7",
         serialization_alias="SnapshotId",
     )
@@ -62,6 +68,11 @@ class _EBS(BaseModel):
         ge=8,
         serialization_alias="VolumeSize",
     )
+
+    iops: int | None = Field(None, serialization_alias="Iops")  # Default: 3000
+    throughput: int | None = Field(
+        None, serialization_alias="Throughput"
+    )  # Default: 125
 
     model_config = ConfigDict(frozen=True)
 
@@ -79,6 +90,11 @@ class _BlockDevice(BaseModel):
     )
 
     model_config = ConfigDict(frozen=True)
+
+
+class _AttachVolume(BaseModel):
+    volume_id: str = Field("vol-xxxxxxxxxxxxxxxxx")
+    device_name: str = Field("/dev/xvdb")
 
 
 class _TagSpecificationTag(BaseModel):
@@ -182,6 +198,21 @@ def _main() -> None:
     block_device = _BlockDevice(
         ebs=_EBS(volume_size=settings.root_volume_size),
     )
+    # block_device_sub = _BlockDevice(
+    #     device_name="/dev/xvdb",
+    #     ebs=_EBS(
+    #         snapshot_id=None,
+    #         delete_on_termination=False,
+    #         volume_size=128,
+    #         iops=3000,
+    #         throughput=125,
+    #     ),
+    # )
+    attach_volumes: list[_AttachVolume] = list()
+    if settings.attach_volumes is not None:
+        attach_volumes = [
+            _AttachVolume(**v.model_dump()) for v in settings.attach_volumes
+        ]
     instance_market_options = _InstanceMarketOptions()
     network_interface = _NetworkInterface(groups=settings.nic_groups)
     metadata_options = _MetadataOptions()
@@ -194,9 +225,15 @@ def _main() -> None:
     )
     _logger.info(
         "block device: {}".format(
-            block_device.model_dump_json(by_alias=True),
+            block_device.model_dump_json(by_alias=True, exclude_none=True),
         )
     )
+    for index in range(len(attach_volumes)):
+        _logger.info(
+            "attach volumes[{}]: {}".format(
+                index, attach_volumes[index].model_dump_json()
+            )
+        )
     _logger.info(
         "instance market options: {}".format(
             instance_market_options.model_dump_json(by_alias=True)
@@ -221,8 +258,8 @@ def _main() -> None:
     # インスタンスの生成
     _logger.info("Launching EC2 ...")
     session = boto3.Session(profile_name=config.profile)
-    ec2_resource = session.resource("ec2")
-    instances = ec2_resource.create_instances(
+    ec2 = session.client("ec2")
+    instances = ec2.run_instances(
         ImageId=settings.ami,
         MaxCount=1,
         MinCount=1,
@@ -232,7 +269,9 @@ def _main() -> None:
         InstanceMarketOptions=instance_market_options.model_dump(
             by_alias=True, exclude_none=True
         ),
-        BlockDeviceMappings=[block_device.model_dump(by_alias=True)],
+        BlockDeviceMappings=[
+            block_device.model_dump(by_alias=True, exclude_none=True),
+        ],
         NetworkInterfaces=[network_interface.model_dump(by_alias=True)],
         MetadataOptions=metadata_options.model_dump(by_alias=True),
         PrivateDnsNameOptions=private_dns_name_options.model_dump(
@@ -240,8 +279,27 @@ def _main() -> None:
         ),
     )
     time.sleep(5.0)
-    instance = instances[0]
+    instance = instances["Instances"][0]
     _logger.info(instance)
+
+    # volumeをアタッチする前にインスタンスがrunningである必要があるため待つ
+    _logger.info("wait for running...")
+    for _ in range(100):
+        time.sleep(1.0)  # 1秒待つ
+        response = ec2.describe_instances(InstanceIds=[instance["InstanceId"]])
+        state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
+        if state == "running":
+            break
+    if state != "running":
+        raise ValueError("EC2 instance is not running.")
+
+    # attach volume
+    for volume in attach_volumes:
+        ec2.attach_volume(
+            InstanceId=instance["InstanceId"],
+            VolumeId=volume.volume_id,
+            Device=volume.device_name,
+        )
 
 
 def _parse_args() -> _RunConfig:
