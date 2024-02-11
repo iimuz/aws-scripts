@@ -1,11 +1,11 @@
 [project]
-authors = [{name = "iimuz", email = "iz.primary.story+github@gmail.com"}]
+authors = [{ name = "iimuz", email = "iz.primary.story+github@gmail.com" }]
 description = "AWS用のスクリプト."
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 name = "aws-scripts"
 readme = "README.md"
 requires-python = ">=3.11"
-urls = {repository = "https://github.com/iimuz/aws-scripts"}
+urls = { repository = "https://github.com/iimuz/aws-scripts" }
 version = "0.1.0"
 
 dependencies = [

@@ -310,7 +310,11 @@ def _parse_args() -> _RunConfig:
     parser.add_argument("-p", "--profile", help="AWS Profile.")
 
     parser.add_argument(
-        "-v", "--verbosity", action="count", default=0, help="詳細メッセージのレベルを設定."
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="詳細メッセージのレベルを設定.",
     )
 
     args = parser.parse_args()
