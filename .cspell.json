@@ -1,0 +1,38 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "autodocstring",
+    "cmds",
+    "devcontainer",
+    "docstring",
+    "dotenv",
+    "dprint",
+    "iimuz",
+    "lastmod",
+    "mypy",
+    "noninteractive",
+    "numpy",
+    "pyproject",
+    "pytest",
+    "setuptools",
+    "Taskfile",
+    "unfixable",
+    "VENV",
+    "venv",
+    "worktree"
+  ],
+  "dictionaries": [],
+  "ignorePaths": [
+    "**/.git/**",
+    "**/.mypy_cache/**",
+    "**/.ruff_cache/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/*.egg-info/**",
+    "**/node_modules/**",
+    "**/package-lock.json",
+    "**/requirements.txt",
+    "**/requirements-dev.txt"
+  ]
+}
