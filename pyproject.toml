@@ -4,8 +4,8 @@ description = "AWS用のスクリプト."
 license = {file = "LICENSE"}
 name = "aws-scripts"
 readme = "README.md"
-requires-python = ">=3.10"
-urls = {repository = "https://github.com/iimuz/til/src/til-20231118"}
+requires-python = ">=3.11"
+urls = {repository = "https://github.com/iimuz/aws-scripts"}
 version = "0.1.0"
 
 dependencies = [
@@ -19,19 +19,41 @@ aws_scripts = "src"
 
 [project.optional-dependencies]
 dev = [
-  "black",
-  "flake8",
-  "flake8-black",
-  "flake8-bugbear",
-  "flake8-docstrings",
-  "flake8-isort",
-  "isort",
   "mypy",
+  "ruff",
 ]
 test = ["pytest"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+# same as black
+indent-width = 4
+line-length = 88
+
+extend-exclude = [
+  ".vscode",
+  "data",
+]
+
+[tool.ruff.lint]
+# Allow lint for all enabled rules
+ignore = [
+  "D203", # `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible
+  "D213", # `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible.
+  # The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`.
+  "COM812",
+  "ISC001",
+]
+select = ["ALL"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+indent-style = "space" # Like Black, indent with spaces, rather than tabs.
+line-ending = "auto" # Like Black, automatically detect the appropriate line ending.
+quote-style = "double" # Like Black, use double quotes for strings.
+skip-magic-trailing-comma = false # Like Black, respect magic trailing commas.
