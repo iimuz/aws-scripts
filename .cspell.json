@@ -3,6 +3,7 @@
   "language": "en",
   "words": [
     "autodocstring",
+    "boto",
     "cmds",
     "devcontainer",
     "docstring",
@@ -10,17 +11,23 @@
     "dprint",
     "iimuz",
     "lastmod",
+    "levelname",
     "mypy",
     "noninteractive",
     "numpy",
+    "pycache",
+    "pydantic",
     "pyproject",
     "pytest",
+    "pyyaml",
     "setuptools",
     "Taskfile",
     "unfixable",
-    "VENV",
     "venv",
-    "worktree"
+    "VENV",
+    "vnev",
+    "worktree",
+    "xvdb"
   ],
   "dictionaries": [],
   "ignorePaths": [
@@ -30,9 +37,9 @@
     "**/.venv/**",
     "**/__pycache__/**",
     "**/*.egg-info/**",
-    "**/node_modules/**",
-    "**/package-lock.json",
-    "**/requirements.txt",
-    "**/requirements-dev.txt"
+    "node_modules/**",
+    "package-lock.json",
+    "requirements.txt",
+    "data/"
   ]
 }
