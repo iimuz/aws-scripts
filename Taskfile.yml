@@ -1,0 +1,66 @@
+version: "3"
+
+vars:
+  PYTHON: python
+  VENV_DIR: .venv
+dotenv: [".env"]
+
+tasks:
+  # 初期環境構築用タスク
+  init:
+    desc: Initialize project.
+    deps:
+      - clean
+    cmds:
+      - "{{.PYTHON}} -m venv {{.VENV_DIR}}"
+      - "{{.PYTHON_VENV}} -m pip install -r requirements.txt"
+      - npm install
+    vars:
+      PYTHON_VENV:
+        sh: |
+          if [[ {{OS}} == "windows" ]]; then
+            echo '{{.VENV_DIR}}\\Scripts\\python.exe'
+          else  # darwin, linux
+            echo '{{.VENV_DIR}}/bin/python'
+          fi
+  clean:
+    # rmは環境によって利用できないのでgit cleanを利用する。
+    desc: Clean files.
+    cmds:
+      - git clean -fdx {{.VENV_DIR}}
+      - git clean -fdx node_modules
+
+  # linter, formatter
+  lint:
+    desc: Lint files.
+    cmds:
+      - "{{.PYTHON}} -m ruff check ."
+      - dprint check
+      - npx prettier --check "**/*.{yml,yaml}"
+      - npx cspell lint . --no-progress
+  format:
+    desc: Format files.
+    cmds:
+      - "{{.PYTHON}} -m ruff format ."
+      - dprint fmt
+      - npx prettier --write "**/*.{yml,yaml}"
+
+  # requirements.txtの更新用タスク
+  # 実行後に下記の修正を手動で実施する必要がある。
+  # - requirements.txtから"-e"で始まる行を削除する。
+  update-requirements:
+    desc: Update requirements-dev.txt.
+    cmds:
+      - "{{.PYTHON}} -m venv {{.VENV_DIR}}"
+      - defer: git clean -fdx {{.VENV_DIR}}
+      - '{{.PYTHON_VENV}} -m pip install -e ".[dev,test]"'
+      - "{{.PYTHON_VENV}} -m pip freeze > requirements.txt"
+    vars:
+      VENV_DIR: .venv-temp
+      PYTHON_VENV:
+        sh: |
+          if [[ {{OS}} == "windows" ]]; then
+            echo '{{.VENV_DIR}}\\Scripts\\python.exe'
+          else  # darwin, linux
+            echo '{{.VENV_DIR}}/bin/python'
+          fi

@@ -1,0 +1,44 @@
+{
+  "editor.detectIndentation": true,
+  // Extension: auto time stamp
+  "lpubsppop01.autoTimeStamp.filenamePattern": ".md",
+  "lpubsppop01.autoTimeStamp.lineLimit": 5,
+  "lpubsppop01.autoTimeStamp.modifiedTimeStart": "lastmod: ",
+  "lpubsppop01.autoTimeStamp.momentFormat": "YYYY-MM-DD",
+  // Language: jupyter
+  "notebook.lineNumbers": "on",
+  "workbench.editorAssociations": {
+    "*.ipynb": "jupyter-notebook"
+  },
+  // Language: json
+  "[json][jsonc][jsonl]": {
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.formatOnSave": true
+  },
+  // Language: markdown
+  "[markdown]": {
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.formatOnSave": true
+  },
+  // Language: python
+  "autoDocstring.docstringFormat": "numpy",
+  "python.languageServer": "Pylance",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  // Language: toml
+  "[toml]": {
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.formatOnSave": true
+  },
+  // Language: yaml
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  }
+}
