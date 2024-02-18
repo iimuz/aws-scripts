@@ -1,6 +1,12 @@
 """開発用のEC2インスタンスを作成するときのスクリプト.
 
-利用例: `python src/create_ec2_spot_instance.py -vv src/create_ec2_config.yml --profile AWS_PROFILE`
+利用例:
+
+```sh
+`python src/create_ec2_spot_instance.py \
+    -vv src/create_ec2_config.yml \
+    --profile AWS_PROFILE
+```
 """
 import logging
 import sys
@@ -43,7 +49,7 @@ class _Settings(BaseModel):
     attach_volumes: list[_AttachVolumesSettings] | None
 
     # Network
-    nic_groups: list[str] = Field(default_factory=lambda: list())
+    nic_groups: list[str] = Field(default_factory=list)
 
     # Security
     ssh_key_name: str
@@ -59,12 +65,12 @@ class _EBS(BaseModel):
         serialization_alias="SnapshotId",
     )
     delete_on_termination: bool = Field(
-        True,
+        default=True,
         serialization_alias="DeleteOnTermination",
     )
     volume_type: str = Field("gp3", serialization_alias="VolumeType")
     volume_size: int = Field(
-        30,
+        default=30,
         ge=8,
         serialization_alias="VolumeSize",
     )
@@ -107,7 +113,7 @@ class _TagSpecificationTag(BaseModel):
 class _TagSpecifications(BaseModel):
     resource_type: str = Field("instance", serialization_alias="ResourceType")
     tags: list[_TagSpecificationTag] = Field(
-        default_factory=lambda: list(), serialization_alias="Tags"
+        default_factory=list, serialization_alias="Tags"
     )
 
     model_config = ConfigDict(frozen=True)
@@ -137,12 +143,10 @@ class _InstanceMarketOptions(BaseModel):
 
 class _NetworkInterface(BaseModel):
     associate_public_ip_address: bool = Field(
-        True, serialization_alias="AssociatePublicIpAddress"
+        default=True, serialization_alias="AssociatePublicIpAddress"
     )
     device_index: int = Field(0, serialization_alias="DeviceIndex")
-    groups: list[str] = Field(
-        default_factory=lambda: list(), serialization_alias="Groups"
-    )
+    groups: list[str] = Field(default_factory=list, serialization_alias="Groups")
 
     model_config = ConfigDict(frozen=True)
 
@@ -160,10 +164,10 @@ class _MetadataOptions(BaseModel):
 class _PrivateDnsNameOptions(BaseModel):
     host_name_type: str = Field("ip-name", serialization_alias="HostnameType")
     enable_resource_name_dns_a_record: bool = Field(
-        True, serialization_alias="EnableResourceNameDnsARecord"
+        default=True, serialization_alias="EnableResourceNameDnsARecord"
     )
     enable_resource_name_dns_aaaa_record: bool = Field(
-        False, serialization_alias="EnableResourceNameDnsAAAARecord"
+        default=False, serialization_alias="EnableResourceNameDnsAAAARecord"
     )
 
     model_config = ConfigDict(frozen=True)
@@ -198,17 +202,7 @@ def _main() -> None:
     block_device = _BlockDevice(
         ebs=_EBS(volume_size=settings.root_volume_size),
     )
-    # block_device_sub = _BlockDevice(
-    #     device_name="/dev/xvdb",
-    #     ebs=_EBS(
-    #         snapshot_id=None,
-    #         delete_on_termination=False,
-    #         volume_size=128,
-    #         iops=3000,
-    #         throughput=125,
-    #     ),
-    # )
-    attach_volumes: list[_AttachVolume] = list()
+    attach_volumes: list[_AttachVolume] = []
     if settings.attach_volumes is not None:
         attach_volumes = [
             _AttachVolume(**v.model_dump()) for v in settings.attach_volumes
@@ -219,40 +213,29 @@ def _main() -> None:
     private_dns_name_options = _PrivateDnsNameOptions()
     # 設定値のログ出力
     _logger.info(
-        "tag specifications: {}".format(
-            tag_specifications.model_dump_json(by_alias=True)
-        )
+        "tag specifications: %s", tag_specifications.model_dump_json(by_alias=True)
     )
     _logger.info(
-        "block device: {}".format(
-            block_device.model_dump_json(by_alias=True, exclude_none=True),
-        )
+        "block device: %s",
+        block_device.model_dump_json(by_alias=True, exclude_none=True),
     )
     for index in range(len(attach_volumes)):
         _logger.info(
-            "attach volumes[{}]: {}".format(
-                index, attach_volumes[index].model_dump_json()
-            )
+            "attach volumes[%d]: %s", index, attach_volumes[index].model_dump_json()
         )
     _logger.info(
-        "instance market options: {}".format(
-            instance_market_options.model_dump_json(by_alias=True)
-        )
+        "instance market options: %s",
+        instance_market_options.model_dump_json(by_alias=True),
     )
     _logger.info(
-        "network interface: {}".format(
-            network_interface.model_dump_json(by_alias=True),
-        )
+        "network interface: %s", network_interface.model_dump_json(by_alias=True)
     )
     _logger.info(
-        "metadata options: {}".format(
-            metadata_options.model_dump_json(by_alias=True),
-        )
+        "metadata options: %s", metadata_options.model_dump_json(by_alias=True)
     )
     _logger.info(
-        "private dns name options: {}".format(
-            private_dns_name_options.model_dump_json(by_alias=True)
-        )
+        "private dns name options: %s",
+        private_dns_name_options.model_dump_json(by_alias=True),
     )
 
     # インスタンスの生成
@@ -291,7 +274,8 @@ def _main() -> None:
         if state == "running":
             break
     if state != "running":
-        raise ValueError("EC2 instance is not running.")
+        message = "EC2 instance is not running."
+        raise ValueError(message)
 
     # attach volume
     for volume in attach_volumes:
@@ -318,9 +302,8 @@ def _parse_args() -> _RunConfig:
     )
 
     args = parser.parse_args()
-    config = _RunConfig(**vars(args))
 
-    return config
+    return _RunConfig(**vars(args))
 
 
 def _setup_logger(filepath: Path | None, loglevel: int) -> None:
@@ -337,6 +320,7 @@ def _setup_logger(filepath: Path | None, loglevel: int) -> None:
     Notes
     -----
     ファイル出力とコンソール出力を行うように設定する。
+
     """
     _logger.setLevel(loglevel)
 
@@ -368,6 +352,6 @@ def _setup_logger(filepath: Path | None, loglevel: int) -> None:
 if __name__ == "__main__":
     try:
         _main()
-    except Exception as e:
-        _logger.exception(e)
+    except Exception:
+        _logger.exception("Unhandled error")
         sys.exit(1)
