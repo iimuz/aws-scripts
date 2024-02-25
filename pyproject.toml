@@ -19,7 +19,9 @@ aws_scripts = "src"
 
 [project.optional-dependencies]
 dev = [
+  "boto3-stubs[ec2]",
   "mypy",
+  "types-pyyaml",
   "ruff",
 ]
 test = ["pytest"]

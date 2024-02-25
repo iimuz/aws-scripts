@@ -1,8 +1,11 @@
-ami: ami-09a81b370b76de6a2
+ami: ami-09a81b370b76de6a2 # ubuntu20.04
 instance_name: test
 instance_type: t2.micro
 # Volumes
-root_volume_size: 30
+root_volume:
+  snapshot_id: snap-0ae02beb4873352c7 # cpu ubuntu
+  volume_size: 30
+attach_volumes: []
 # Network
 nic_groups: []
 # Security
