@@ -15,9 +15,31 @@ from argparse import ArgumentParser
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Self
 
 import boto3
 import yaml
+from mypy_boto3_ec2.literals import (
+    HostnameTypeType,
+    HttpTokensStateType,
+    InstanceMetadataEndpointStateType,
+    InstanceTypeType,
+    MarketTypeType,
+    ResourceTypeType,
+    SpotInstanceTypeType,
+    VolumeTypeType,
+)
+from mypy_boto3_ec2.type_defs import (
+    BlockDeviceMappingTypeDef,
+    EbsBlockDeviceTypeDef,
+    InstanceMarketOptionsRequestTypeDef,
+    InstanceMetadataOptionsRequestTypeDef,
+    InstanceNetworkInterfaceSpecificationTypeDef,
+    PrivateDnsNameOptionsRequestTypeDef,
+    SpotMarketOptionsTypeDef,
+    TagSpecificationTypeDef,
+    TagTypeDef,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 _logger = logging.getLogger(__name__)
@@ -39,13 +61,47 @@ class _AttachVolumesSettings(BaseModel):
     device_name: str
 
 
+class _EBS(BaseModel):
+    """EBSボリュームの設定."""
+
+    snapshot_id: str = Field(
+        default="snap-0ae02beb4873352c7",  # cpu ubuntu
+        serialization_alias="SnapshotId",
+    )
+    delete_on_termination: bool = Field(
+        default=True,
+        serialization_alias="DeleteOnTermination",
+    )
+    volume_type: VolumeTypeType = Field(default="gp3", serialization_alias="VolumeType")
+    volume_size: int = Field(
+        default=30,
+        ge=8,
+        serialization_alias="VolumeSize",
+    )
+
+    iops: int = Field(default=3000, serialization_alias="Iops")
+    throughput: int = Field(default=125, serialization_alias="Throughput")
+
+    model_config = ConfigDict(frozen=True)
+
+    def to_ebs(self: Self) -> EbsBlockDeviceTypeDef:
+        return EbsBlockDeviceTypeDef(
+            SnapshotId=self.snapshot_id,
+            DeleteOnTermination=self.delete_on_termination,
+            VolumeType=self.volume_type,
+            VolumeSize=self.volume_size,
+            Iops=self.iops,
+            Throughput=self.throughput,
+        )
+
+
 class _Settings(BaseModel):
     ami: str
     instance_name: str
-    instance_type: str
+    instance_type: InstanceTypeType
 
     # Volumes
-    root_volume_size: int = Field(30, ge=8, help="ルートボリュームのサイズ(GB).")
+    root_volume: _EBS = Field(_EBS(), help="ルートボリュームの設定.")
     attach_volumes: list[_AttachVolumesSettings] | None
 
     # Network
@@ -57,37 +113,11 @@ class _Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class _EBS(BaseModel):
-    """EBSボリュームの設定."""
-
-    snapshot_id: str | None = Field(
-        "snap-0ae02beb4873352c7",
-        serialization_alias="SnapshotId",
-    )
-    delete_on_termination: bool = Field(
-        default=True,
-        serialization_alias="DeleteOnTermination",
-    )
-    volume_type: str = Field("gp3", serialization_alias="VolumeType")
-    volume_size: int = Field(
-        default=30,
-        ge=8,
-        serialization_alias="VolumeSize",
-    )
-
-    iops: int | None = Field(None, serialization_alias="Iops")  # Default: 3000
-    throughput: int | None = Field(
-        None, serialization_alias="Throughput"
-    )  # Default: 125
-
-    model_config = ConfigDict(frozen=True)
-
-
 class _BlockDevice(BaseModel):
     """ブロックストレージの設定."""
 
     device_name: str = Field(
-        "/dev/sda1",
+        default="/dev/sda1",
         serialization_alias="DeviceName",
     )
     ebs: _EBS = Field(
@@ -96,6 +126,11 @@ class _BlockDevice(BaseModel):
     )
 
     model_config = ConfigDict(frozen=True)
+
+    def to_block_device_mapping(self: Self) -> BlockDeviceMappingTypeDef:
+        return BlockDeviceMappingTypeDef(
+            DeviceName=self.device_name, Ebs=self.ebs.to_ebs()
+        )
 
 
 class _AttachVolume(BaseModel):
@@ -109,30 +144,57 @@ class _TagSpecificationTag(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    def to_tag(self: Self) -> TagTypeDef:
+        return TagTypeDef(
+            Key=self.key,
+            Value=self.value,
+        )
+
 
 class _TagSpecifications(BaseModel):
-    resource_type: str = Field("instance", serialization_alias="ResourceType")
+    resource_type: ResourceTypeType = Field(
+        default="instance", serialization_alias="ResourceType"
+    )
     tags: list[_TagSpecificationTag] = Field(
         default_factory=list, serialization_alias="Tags"
     )
 
     model_config = ConfigDict(frozen=True)
 
+    def to_tag_specification(self: Self) -> TagSpecificationTypeDef:
+        return TagSpecificationTypeDef(
+            ResourceType=self.resource_type,
+            Tags=[t.to_tag() for t in self.tags],
+        )
+
 
 class _SpotOptions(BaseModel):
     max_price: str | None = Field(
-        None, serialization_alias="MaxPrice", exclude_none=True
+        default=None, serialization_alias="MaxPrice", exclude_none=True
     )
-    spot_instance_type: str = Field(
-        "one-time",
+    spot_instance_type: SpotInstanceTypeType = Field(
+        default="one-time",
         serialization_alias="SpotInstanceType",
     )
 
     model_config = ConfigDict(frozen=True)
 
+    def to_spot_options(self: Self) -> SpotMarketOptionsTypeDef:
+        if self.max_price is None:
+            return SpotMarketOptionsTypeDef(
+                SpotInstanceType=self.spot_instance_type,
+            )
+
+        return SpotMarketOptionsTypeDef(
+            MaxPrice=self.max_price,
+            SpotInstanceType=self.spot_instance_type,
+        )
+
 
 class _InstanceMarketOptions(BaseModel):
-    market_type: str = Field("spot", serialization_alias="MarketType")
+    market_type: MarketTypeType = Field(
+        default="spot", serialization_alias="MarketType"
+    )
     spot_options: _SpotOptions = Field(
         default_factory=lambda: _SpotOptions(),
         serialization_alias="SpotOptions",
@@ -140,29 +202,59 @@ class _InstanceMarketOptions(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    def to_instance_market_options(self: Self) -> InstanceMarketOptionsRequestTypeDef:
+        return InstanceMarketOptionsRequestTypeDef(
+            MarketType=self.market_type,
+            SpotOptions=self.spot_options.to_spot_options(),
+        )
+
 
 class _NetworkInterface(BaseModel):
     associate_public_ip_address: bool = Field(
         default=True, serialization_alias="AssociatePublicIpAddress"
     )
-    device_index: int = Field(0, serialization_alias="DeviceIndex")
+    device_index: int = Field(default=0, serialization_alias="DeviceIndex")
     groups: list[str] = Field(default_factory=list, serialization_alias="Groups")
 
     model_config = ConfigDict(frozen=True)
 
+    def to_network_interface(
+        self: Self,
+    ) -> InstanceNetworkInterfaceSpecificationTypeDef:
+        return InstanceNetworkInterfaceSpecificationTypeDef(
+            AssociatePublicIpAddress=self.associate_public_ip_address,
+            DeviceIndex=self.device_index,
+            Groups=self.groups,
+        )
+
 
 class _MetadataOptions(BaseModel):
-    http_tokens: str = Field("required", serialization_alias="HttpTokens")
-    http_endpoint: str = Field("enabled", serialization_alias="HttpEndpoint")
+    http_tokens: HttpTokensStateType = Field(
+        default="required", serialization_alias="HttpTokens"
+    )
+    http_endpoint: InstanceMetadataEndpointStateType = Field(
+        default="enabled", serialization_alias="HttpEndpoint"
+    )
     http_put_response_hop_limit: int = Field(
-        2, serialization_alias="HttpPutResponseHopLimit"
+        default=2, serialization_alias="HttpPutResponseHopLimit"
     )
 
     model_config = ConfigDict(frozen=True)
 
+    def to_instance_metadata_options(
+        self: Self,
+    ) -> InstanceMetadataOptionsRequestTypeDef:
+        return InstanceMetadataOptionsRequestTypeDef(
+            HttpTokens=self.http_tokens,
+            HttpEndpoint=self.http_endpoint,
+            HttpPutResponseHopLimit=self.http_put_response_hop_limit,
+        )
+
 
 class _PrivateDnsNameOptions(BaseModel):
-    host_name_type: str = Field("ip-name", serialization_alias="HostnameType")
+    host_name_type: HostnameTypeType = Field(
+        default="ip-name", serialization_alias="HostnameType"
+    )
     enable_resource_name_dns_a_record: bool = Field(
         default=True, serialization_alias="EnableResourceNameDnsARecord"
     )
@@ -171,6 +263,15 @@ class _PrivateDnsNameOptions(BaseModel):
     )
 
     model_config = ConfigDict(frozen=True)
+
+    def to_private_dns_name_options(
+        self: Self,
+    ) -> PrivateDnsNameOptionsRequestTypeDef:
+        return PrivateDnsNameOptionsRequestTypeDef(
+            HostnameType=self.host_name_type,
+            EnableResourceNameDnsARecord=self.enable_resource_name_dns_a_record,
+            EnableResourceNameDnsAAAARecord=self.enable_resource_name_dns_aaaa_record,
+        )
 
 
 def _main() -> None:
@@ -199,9 +300,7 @@ def _main() -> None:
     tag_specifications = _TagSpecifications(
         tags=[_TagSpecificationTag(key="Name", value=settings.instance_name)]
     )
-    block_device = _BlockDevice(
-        ebs=_EBS(volume_size=settings.root_volume_size),
-    )
+    block_device = _BlockDevice(ebs=settings.root_volume)
     attach_volumes: list[_AttachVolume] = []
     if settings.attach_volumes is not None:
         attach_volumes = [
@@ -247,19 +346,13 @@ def _main() -> None:
         MaxCount=1,
         MinCount=1,
         InstanceType=settings.instance_type,
-        TagSpecifications=[tag_specifications.model_dump(by_alias=True)],
+        TagSpecifications=[tag_specifications.to_tag_specification()],
         KeyName=settings.ssh_key_name,
-        InstanceMarketOptions=instance_market_options.model_dump(
-            by_alias=True, exclude_none=True
-        ),
-        BlockDeviceMappings=[
-            block_device.model_dump(by_alias=True, exclude_none=True),
-        ],
-        NetworkInterfaces=[network_interface.model_dump(by_alias=True)],
-        MetadataOptions=metadata_options.model_dump(by_alias=True),
-        PrivateDnsNameOptions=private_dns_name_options.model_dump(
-            by_alias=True,
-        ),
+        InstanceMarketOptions=instance_market_options.to_instance_market_options(),
+        BlockDeviceMappings=[block_device.to_block_device_mapping()],
+        NetworkInterfaces=[network_interface.to_network_interface()],
+        MetadataOptions=metadata_options.to_instance_metadata_options(),
+        PrivateDnsNameOptions=private_dns_name_options.to_private_dns_name_options(),
     )
     time.sleep(5.0)
     instance = instances["Instances"][0]
